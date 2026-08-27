@@ -1218,7 +1218,7 @@
         <h2 style="margin-top:0">Eliminar registro</h2>
         <p id="deleteSelected" class="muted"></p>
         <div class="delete-warning">
-          Esta acción eliminará permanentemente el registro seleccionado y no se puede deshacer.
+          Esta acción retirará el registro del dashboard. Se conservará una copia de auditoría.
         </div>
         <input type="hidden" id="deleteRid" />
         <div>
@@ -1229,7 +1229,7 @@
         </div>
         <div class="actions">
           <button type="button" class="ghost" id="cancelDelete">Cancelar</button>
-          <button type="submit" class="danger">Eliminar definitivamente</button>
+          <button type="submit" class="danger">Eliminar registro</button>
         </div>
       </form>
     </div>
@@ -1338,7 +1338,14 @@ await db.collection(COLLECTION).limit(1).get();
       }
       async function deleteRecord(id) {
         if (cloud) {
-          await db.collection(COLLECTION).doc(id).delete();
+          // Las reglas actuales permiten actualizar, pero bloquean el borrado
+          // físico. Se usa baja lógica para retirar el registro del sistema y
+          // conservar una copia de auditoría en Firebase.
+          await db.collection(COLLECTION).doc(id).update({
+            eliminado: true,
+            eliminadoEn: new Date().toISOString(),
+            eliminadoPor: "Calidad",
+          });
         } else {
           saveLocal(localRows().filter((x) => x.id !== id));
         }
@@ -1349,7 +1356,7 @@ await db.collection(COLLECTION).limit(1).get();
             .collection(COLLECTION)
             .orderBy("creadoEn", "desc")
             .get();
-          return s.docs.map((d) => d.data());
+          return s.docs.map((d) => d.data()).filter((x) => !x.eliminado);
         }
         return localRows();
       }
@@ -1361,7 +1368,9 @@ await db.collection(COLLECTION).limit(1).get();
             .onSnapshot(
               (s) => {
                 setConnection(true);
-                handler(s.docs.map((d) => d.data()));
+                handler(
+                  s.docs.map((d) => d.data()).filter((x) => !x.eliminado),
+                );
               },
               () => setConnection(false),
             );
@@ -1954,7 +1963,7 @@ await db.collection(COLLECTION).limit(1).get();
         e.preventDefault();
         deleteErrorElement.classList.add("hidden");
 
-        if (deletePasswordElement.value !== "3508") {
+        if (deletePasswordElement.value !== "Calidad123") {
           deleteErrorElement.classList.remove("hidden");
           deletePasswordElement.select();
           return;
@@ -1968,9 +1977,9 @@ await db.collection(COLLECTION).limit(1).get();
         }
 
         const confirmationTexts = {
-          es: "¿Confirmas que deseas eliminar permanentemente el registro ",
-          en: "Do you confirm that you want to permanently delete record ",
-          ko: "다음 기록을 영구 삭제하시겠습니까? "
+          es: "¿Confirmas que deseas retirar del dashboard el registro ",
+          en: "Do you confirm that you want to remove from the dashboard record ",
+          ko: "대시보드에서 다음 기록을 제거하시겠습니까? "
         };
         const confirmed = window.confirm(
           (confirmationTexts[currentLang] || confirmationTexts.es) +
