@@ -1976,20 +1976,14 @@ await db.collection(COLLECTION).limit(1).get();
           return;
         }
 
-        const confirmationTexts = {
-          es: "¿Confirmas que deseas retirar del dashboard el registro ",
-          en: "Do you confirm that you want to remove from the dashboard record ",
-          ko: "대시보드에서 다음 기록을 제거하시겠습니까? "
-        };
-        const confirmed = window.confirm(
-          (confirmationTexts[currentLang] || confirmationTexts.es) +
-            record.id.slice(0, 8).toUpperCase() +
-            "?"
-        );
-        if (!confirmed) return;
-
+        const submitButton = deleteFormElement.querySelector('button[type="submit"]');
+        const originalButtonText = submitButton.textContent;
         try {
+          submitButton.disabled = true;
+          submitButton.textContent = "Eliminando...";
           await deleteRecord(id);
+          data = data.filter((x) => x.id !== id);
+          render();
           deleteModalElement.classList.add("hidden");
           deleteFormElement.reset();
           if (!cloud) applyLive(localRows());
@@ -2001,6 +1995,9 @@ await db.collection(COLLECTION).limit(1).get();
             ko: "기록을 삭제할 수 없습니다."
           };
           alert(errorTexts[currentLang] || errorTexts.es);
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = originalButtonText;
         }
       };
       cancel.onclick = () => modal.classList.add("hidden");
